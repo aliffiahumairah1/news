@@ -3,3 +3,8 @@ requests
 beautifulsoup4
 feedparser
 python-dotenv
+torch --extra-index-url https://download.pytorch.org/whl/cpu
+transformers
+bertopic
+pandas
+scikit-learn

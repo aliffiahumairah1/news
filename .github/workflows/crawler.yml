@@ -1,4 +1,4 @@
-name: Automatic News Crawler Cron
+name: Automatic News Analytics Pipeline
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # Supaya tetap bisa di-run manual kapan saja
 
 jobs:
-  run-crawler:
+  run-pipeline:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,9 +32,19 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Execute Crawler Script
+      - name: Execute Full Analytics Pipeline
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
+          echo "1. Running Crawler..."
           python crawler.py
+          
+          echo "2. Running Sentiment Analysis (IndoBERT)..."
+          python sentiment.py
+          
+          echo "3. Running Topic Modeling (BERTopic)..."
+          python topic.py
+          
+          echo "4. Generating Recommendations..."
+          python recommendation.py
