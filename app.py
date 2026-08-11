@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # Konfigurasi Halaman Streamlit
@@ -12,10 +11,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load Kredensial Supabase
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Load Kredensial Supabase dari Streamlit Secrets
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 @st.cache_resource
 def init_supabase() -> Client:
@@ -30,15 +28,20 @@ page = st.sidebar.radio(
     ["🏠 Home & Trending Topics", "📊 Analysis & Sentiments", "🎯 Editor Recommendations", "📈 Model Evaluation Logs"]
 )
 
-# HALAMAN: HOME & TRENDING TOPICS
+# HOME & TRENDING TOPICS
 if page == "🏠 Home & Trending Topics":
     st.title("📰 AI-Based News Trend Intelligence Dashboard")
     st.caption("Monitoring Tren Berita Real-time & Kluster Topik BERTopic")
 
     # Metrics
-    news_count = len(supabase.table("news").select("id", count="exact").execute().data or [])
-    topic_count = len(supabase.table("topics").select("id", count="exact").execute().data or [])
-    rec_count = len(supabase.table("recommendations").select("id").eq("status", "pending").execute().data or [])
+    news_res = supabase.table("news").select("id").execute()
+    news_count = len(news_res.data) if news_res.data else 0
+
+    topic_res = supabase.table("topics").select("id").execute()
+    topic_count = len(topic_res.data) if topic_res.data else 0
+
+    rec_res = supabase.table("recommendations").select("id").eq("status", "pending").execute()
+    rec_count = len(rec_res.data) if rec_res.data else 0
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Berita Terkumpul", f"{news_count} Artikel")
@@ -70,7 +73,7 @@ if page == "🏠 Home & Trending Topics":
             use_container_width=True
         )
 
-# HALAMAN: ANALYSIS & SENTIMENTS
+# ANALYSIS & SENTIMENTS
 elif page == "📊 Analysis & Sentiments":
     st.title("📊 Analisis Sentimen Berita (IndoBERT)")
     
@@ -112,7 +115,7 @@ elif page == "📊 Analysis & Sentiments":
             use_container_width=True
         )
 
-# HALAMAN: EDITOR RECOMMENDATIONS (KOMBINAIS HIBRIDA: SUMBER DOMINAN + BERITA TERBARU)
+# EDITOR RECOMMENDATIONS
 elif page == "🎯 Editor Recommendations":
     st.title("🎯 Rekomendasi Topik untuk Redaksi (Feedback Loop)")
     st.caption("Gunakan masukan ini untuk menentukan topik liputan utama redaksi.")
@@ -132,9 +135,8 @@ elif page == "🎯 Editor Recommendations":
             with st.expander(f"📌 {topic_name} — Skor Rekomendasi: {rec_score}/100 (Status: {status.upper()})"):
                 st.markdown(f"**Alasan Rekomendasi:** {reason}")
                 
-                # --- KOMBINASI HIBRIDA: AMBIL BERITA TERBARU DARI SUMBER MEDIA TERBANAYAK ---
+                # Sample berita dari sumber dominan
                 if topic_id:
-                    # 1. Ambil seluruh berita dalam topik ini beserta nama sumbernya
                     news_in_topic = supabase.table("news") \
                         .select("id, title, url, published_at, source_id, sources(name)") \
                         .eq("topic_id", topic_id) \
@@ -144,15 +146,12 @@ elif page == "🎯 Editor Recommendations":
                     if news_in_topic.data:
                         df_news_topic = pd.DataFrame(news_in_topic.data)
                         
-                        # Extract nama sumber berita
                         df_news_topic['source_name'] = df_news_topic['sources'].apply(
                             lambda x: x['name'] if isinstance(x, dict) and 'name' in x else "Sumber"
                         )
                         
-                        # Hitung volume berita per sumber & ambil 5 sumber teratas (paling dominan)
                         top_sources = df_news_topic['source_name'].value_counts().head(5).index.tolist()
                         
-                        # Untuk setiap sumber dominan, ambil 1 artikel paling baru (terupdate)
                         hybrid_samples = []
                         for src in top_sources:
                             latest_news_from_src = df_news_topic[df_news_topic['source_name'] == src].iloc[0]
@@ -167,8 +166,7 @@ elif page == "🎯 Editor Recommendations":
                             src_name = item["source_name"]
                             st.markdown(f"- [{news_title}]({news_url}) *— ({src_name})*")
                             
-                    st.write("") # Spasi tambahan
-                # --------------------------------------------------------------------------
+                    st.write("")
 
                 # Form Feedback Loop Redaksi
                 with st.form(key=f"feedback_form_{rec_id}"):
@@ -188,7 +186,7 @@ elif page == "🎯 Editor Recommendations":
                         st.success("Feedback redaksi berhasil disimpan ke Supabase!")
                         st.rerun()
 
-# HALAMAN: MODEL EVALUATION LOGS
+# MODEL EVALUATION LOGS
 elif page == "📈 Model Evaluation Logs":
     st.title("📈 Transparansi Performa Model AI")
     st.caption("Metrik Evaluasi Performa Model IndoBERT Sentimen & BERTopic")
