@@ -34,14 +34,23 @@ if page == "🏠 Home & Trending Topics":
     st.caption("Monitoring Tren Berita Real-time & Kluster Topik BERTopic")
 
     # Metrics
-    news_res = supabase.table("news").select("id").execute()
-    news_count = len(news_res.data) if news_res.data else 0
+    try:
+        news_res = supabase.table("news").select("*", count="exact").limit(1).execute()
+        news_count = news_res.count if news_res.count is not None else 0
+    except Exception:
+        news_count = 0
 
-    topic_res = supabase.table("topics").select("id").execute()
-    topic_count = len(topic_res.data) if topic_res.data else 0
+    try:
+        topic_res = supabase.table("topics").select("*", count="exact").limit(1).execute()
+        topic_count = topic_res.count if topic_res.count is not None else 0
+    except Exception:
+        topic_count = 0
 
-    rec_res = supabase.table("recommendations").select("id").eq("status", "pending").execute()
-    rec_count = len(rec_res.data) if rec_res.data else 0
+    try:
+        rec_res = supabase.table("recommendations").select("*", count="exact").eq("status", "pending").limit(1).execute()
+        rec_count = rec_res.count if rec_res.count is not None else 0
+    except Exception:
+        rec_count = 0
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Berita Terkumpul", f"{news_count} Artikel")
