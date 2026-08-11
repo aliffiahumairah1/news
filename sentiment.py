@@ -85,7 +85,7 @@ def run_sentiment_pipeline():
         
         # Simpan batch per 50 item ke Supabase
         if len(sentiments_payload) >= 50 or idx == len(unprocessed_news):
-            supabase.table("sentiments").insert(sentiments_payload).execute()
+            supabase.table("sentiments").upsert(sentiments_payload, on_conflict="news_id").execute()
             print(f"-> Berhasil menyimpan batch {len(sentiments_payload)} data sentimen.")
             sentiments_payload = []
 
