@@ -15,7 +15,13 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def generate_recommendations():
     print("MEMULAI GENERASI REKOMENDASI REDAKSI")
     
-    # 1. Ambil daftar topik
+    # Bersihkan rekomendasi lama agar data selalu fresh & tidak konflik ID
+    try:
+        supabase.table("recommendations").delete().gt("id", 0).execute()
+    except Exception as e:
+        print(f"Catatan pembersihan rekomendasi: {e}")
+
+    # Ambil daftar topik
     topics_res = supabase.table("topics").select("*").execute()
     topics = topics_res.data
     
@@ -33,9 +39,9 @@ def generate_recommendations():
         keywords = topic.get("keywords", "")
         trend_score = topic.get("trend_score", 0.0)
         
-        # 2. Hitung jumlah berita & distribusi sentimen per topik
+        # Hitung jumlah berita per topik
         news_in_topic = supabase.table("news").select("id").eq("topic_id", topic_id).execute().data
-        news_count = len(news_in_topic)
+        news_count = len(news_in_topic) if news_in_topic else 0
         
         if news_count == 0:
             continue
@@ -49,23 +55,19 @@ def generate_recommendations():
             f"Kata kunci utama meliputi: {keywords}."
         )
         
-        # Cek apakah rekomendasi untuk topik ini sudah ada agar tidak duplikat
-        existing_rec = supabase.table("recommendations").select("id").eq("topic_id", topic_id).execute().data
-        
-        if not existing_rec:
-            recommendations_payload.append({
-                "topic_id": topic_id,
-                "recommendation_score": rec_score,
-                "reason": reason,
-                "status": "pending"
-            })
+        recommendations_payload.append({
+            "topic_id": topic_id,
+            "recommendation_score": rec_score,
+            "reason": reason,
+            "status": "pending"
+        })
 
-    # 3. Simpan rekomendasi baru ke Supabase
+    # Simpan rekomendasi baru ke Supabase
     if recommendations_payload:
         supabase.table("recommendations").insert(recommendations_payload).execute()
         print(f"Berhasil menyimpan {len(recommendations_payload)} rekomendasi topik baru ke Supabase.")
     else:
-        print("Semua topik sudah memiliki entri rekomendasi.")
+        print("Tidak ada rekomendasi baru yang dihasilkan.")
 
     print("GENERASI REKOMENDASI SELESAI")
 
